@@ -1,0 +1,140 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Awesome Website</title>
+    <meta name="description" content="A beautiful, fast website deployed on Vercel" />
+
+    <!-- Open Graph / Social sharing -->
+    <meta property="og:title" content="My Awesome Website" />
+    <meta property="og:description" content="A beautiful, fast website deployed on Vercel" />
+    <meta property="og:image" content="https://yourdomain.com/og-image.jpg" />
+    <meta property="og:url" content="https://yourdomain.com" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚀</text></svg>">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        --bg: #0d1117;
+        --text: #f0f6fc;
+        --accent: #58a6ff;
+        --card: #161b22;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+        color: var(--text);
+        line-height: 1.6;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+      }
+
+      .container {
+        max-width: 800px;
+        text-align: center;
+      }
+
+      h1 {
+        font-size: 4rem;
+        font-weight: 800;
+        margin-bottom: 1rem;
+        background: linear-gradient(90deg, #58a6ff, #c058ff);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+
+      p {
+        font-size: 1.25rem;
+        opacity: 0.9;
+        margin-bottom: 2rem;
+      }
+
+      .buttons {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      a.btn {
+        padding: 0.75rem 1.5rem;
+        background: var(--accent);
+        color: white;
+        text-decoration: none;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.2s;
+      }
+
+      a.btn:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 20px rgba(88, 166, 255, 0.3);
+      }
+
+      a.btn.secondary {
+        background: transparent;
+        border: 2px solid var(--accent);
+      }
+
+      footer {
+        margin-top: 4rem;
+        opacity: 0.7;
+        font-size: 0.9rem;
+      }
+
+      @media (max-width: 640px) {
+        h1 {
+          font-size: 3rem;
+        }
+        .buttons {
+          flex-direction: column;
+          align-items: center;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <h1>Welcome!</h1>
+      <p>
+        Your website is now live on <strong>Vercel</strong> -- fast, secure, and globally distributed.
+      </p>
+
+      <div class="buttons">
+        <a href="https://vercel.com" class="btn" target="_blank">
+          Powered by Vercel
+        </a>
+        <a href="https://github.com" class="btn secondary" target="_blank">
+          View on GitHub
+        </a>
+      </div>
+
+      <footer>
+        Deployed instantly • Zero configuration • Free SSL
+      </footer>
+    </div>
+  </body>
+</html>
