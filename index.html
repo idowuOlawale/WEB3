@@ -1,0 +1,73 @@
+<?php session_start();
+// CHANGE THIS TO YOUR OWN SECRET PASSWORD
+$password = "anita123";
+
+if ($_POST['pw'] ?? '' === $password) $_SESSION['ok'] = true;
+if ($_GET['out'] ?? '' === 'out') { session_destroy(); header("Location: /"); exit; }
+
+if ($_SESSION['ok'] ?? false && $_FILES['f'] ?? false) {
+    @mkdir("u", 0755);
+    move_uploaded_file($_FILES['f']['tmp_name'], "u/".time().$_FILES['f']['name']);
+}
+?>
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>♡ Anita & Babe Only ♡</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body{margin:0;background:#000 url('https://images.unsplash.com/photo-1519741497674-611481863552?q=80&w=1974') center/cover fixed;color:#fff;font-family:Arial,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh}
+        .box{max-width:500px;padding:40px;background:rgba(0,0,0,0.7);border-radius:25px;text-align:center}
+        h1{font-size:4rem;color:#ff69b4;margin:0}
+        p{font-size:1.4rem;line-height:1.8}
+        input,button{padding:15px;margin:10px;font-size:1.2rem;border:none;border-radius:50px;width:80%}
+        button{background:#ff69b4;color:white;cursor:pointer}
+        button:hover{background:#ff8ac4}
+        .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px;margin-top:30px}
+        img,video{max-width:100%;border-radius:15px}
+    </style>
+</head>
+<body>
+
+<div class="box">
+
+<?php if (!($_SESSION['ok'] ?? false)): ?>
+
+    <h1>♡ Anita & Babe ♡</h1>
+    <p>My love,<br>this tiny secret place is only for us.<br>Every photo and video here is a little piece of forever.<br>I love you more than words ♡</p>
+    <form method="post">
+        <input type="password" name="pw" placeholder="Our password" required autofocus>
+        <button>Enter ♡</button>
+    </form>
+
+<?php else: ?>
+
+    <h1>Our private world ♡</h1>
+    <p>Welcome back my beautiful girl</p>
+    <a href="?out=1" style="color:#ff69b4">Logout</a>
+
+    <div class="grid">
+        <?php
+        foreach (glob("u/*.*") as $file) {
+            if (in_array(strtolower(pathinfo($file,4)), ['jpg','jpeg','png','gif','mp4','mov','webm']))
+                echo strpos($file,'.mp4')||strpos($file,'.mov')||strpos($file,'.webm')
+                    ? "<video controls><source src='$file'></video>"
+                    : "<img src='$file'>";
+        }
+        ?>
+    </div>
+
+    <form method="post" enctype="multipart/form-data" style="margin-top:30px">
+        <input type="file" name="f" accept="image/*,video/*" required>
+        <button>Upload new memory ♡</button>
+    </form>
+
+<?php endif; ?>
+
+</div>
+</body>
+
+
+
