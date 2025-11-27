@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Olawale & Anita • Private Love Vault</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #111, #550055);
+            color: #fff;
+            margin: 0;
+            text-align: center;
+        }
+        header {
+            padding: 30px;
+            font-size: 28px;
+            font-weight: bold;
+            background: rgba(0,0,0,0.3);
+        }
+        .love-note {
+            font-size: 18px;
+            margin: 10px auto 25px;
+            width: 80%;
+            line-height: 1.5;
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+        }
+        .container { width: 90%; margin: auto; }
+        form {
+            background: rgba(255,255,255,0.12);
+            padding: 20px;
+            border-radius: 12px;
+            max-width: 400px;
+            margin: 15px auto;
+        }
+        .gallery {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        img, video {
+            width: 220px;
+            height: auto;
+            margin: 10px;
+            border-radius: 15px;
+            border: 3px solid rgba(255,255,255,0.4);
+            transition: transform 0.3s;
+        }
+        img:hover, video:hover {
+            transform: scale(1.06);
+        }
+    </style>
+</head>
+<body>
+
+<header>❤️ Olawale & Anita’s Private Love Vault ❤️</header>
+
+<script>
+function login() {
+    const pwd = prompt("Enter Password:");
+    if (pwd !== "ourlove2025") {
+        alert("Access Denied 😜");
+        window.location.reload();
+    }
+}
+login();
+</script>
+
+<div class="container">
+
+    <p class="love-note">
+        To Anita & Olawale:  
+        A love that is joyful, private, playful — and just for the two of you.  
+        Every picture here is a memory, every video is a heartbeat.  
+        Keep loving, laughing, and enjoying each other forever. ❤️
+    </p>
+
+    <form action="upload.php" method="POST" enctype="multipart/form-data">
+        <h3>✨ Add a New Memory ✨</h3>
+        <input type="file" name="file" accept="image/*,video/*" required>
+        <br><br>
+        <button type="submit">Upload</button>
+    </form>
+
+    <h3>💞 Our Gallery 💞</h3>
+
+    <div class="gallery">
+    <?php
+    $files = array_diff(scandir("."), array("index.html", "upload.php"));
+    foreach ($files as $file) {
+        $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+        if (in_array($ext, ["jpg","jpeg","png","gif"])) {
+            echo "<img src='$file'>";
+        } elseif (in_array($ext, ["mp4","webm","mov"])) {
+            echo "<video controls src='$file'></video>";
+        }
+    }
+    ?>
+    </div>
+
+</div>
+</body>
+</html>
+
+
