@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BIP39 Recovery Tool • Find Your Missing Seed Word</title>
+  <meta name="description" content="100% client-side BIP39 recovery tool – safely find your missing 12/24-word seed phrase."/>
+  <script src="https://cdn.jsdelivr.net/npm/bip39@3.1.0/dist/bip39.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+  <style>
+    :root { --bg: #0f0f1f; --card: rgba(30,30,60,0.6); --accent: #00ff9d; }
+    body {margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:#fff; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; background:radial-gradient(circle at top left,#1a1a3a,#000);}
+    .card {background:var(--card); backdrop-filter:blur(20px); border-radius:24px; padding:40px 30px; width:100%; max-width:520px; box-shadow:0 20px 60px rgba(0,0,0,0.7); border:1px solid rgba(255,255,255,0.1);}
+    h1 {font-size:28px; text-align:center; background:linear-gradient(90deg,#00ff9d,#00d4ff); -webkit-background-clip:text; -webkit-text-fill-color:transparent;}
+    .tag {text-align:center; font-size:15px; opacity:0.85; margin:10px 0 30px;}
+    input,textarea,select{width:100%;padding:16px;margin:12px 0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:16px;color:#fff;font-size:16px;}
+    button{width:100%;padding:18px;margin:30px 0 10px;background:var(--accent);color:#000;font-weight:bold;border:none;border-radius:16px;cursor:pointer;font-size:18px;transition:0.3s;}
+    button:disabled{background:#333;cursor:not-allowed;}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0;}
+    .slot{background:rgba(255,255,255,0.08);padding:14px;text-align:center;border-radius:14px;font-weight:600;}
+    .missing{background:#ff2d95 !important;animation:pulse 1.8s infinite;}
+    .result{margin-top:30px;padding:24px;background:rgba(0,255,150,0.15);border-radius:16px;display:none;border:1px solid rgba(0,255,150,0.3);}
+    .phrase{background:#000;padding:16px;border-radius:12px;margin:12px 0;font-family:monospace;word-break:break-all;}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.6}}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>BIP39 Recovery Tool</h1>
+    <div class="tag">Find your missing seed word • 100% private • runs in your browser</div>
+
+    <input type="text" id="addr" placeholder="Target address (0x…)" />
+
+    <select id="length">
+      <option value="12">12-word phrase</option>
+      <option value="24">24-word phrase</option>
+    </select>
+
+    <textarea id="words" rows="5" placeholder="Enter your known words + one ???? (e.g. abandon abandon ... ???? ... zoo)"></textarea>
+
+    <div class="grid" id="grid"></div>
+
+    <button id="go">FIND MISSING WORD</button>
+    <div id="status" style="text-align:center;margin:15px 0;"></div>
+    <div class="result" id="result"></div>
+  </div>
+
+<script>
+  const grid = document.getElementById("grid");
+  function buildGrid(n) {
+    grid.innerHTML = "";
+    for(let i=1;i<=n;i++) grid.innerHTML += `<div class="slot" id="s${i}">${i}</div>`;
+  }
+  buildGrid(12);
+
+  document.getElementById("length").onchange = () => buildGrid(document.getElementById("length").value);
+
+  document.getElementById("go").onclick = async () => {
+    const btn = document.getElementById("go");
+    const status = document.getElementById("status");
+    const result = document.getElementById("result");
+    btn.disabled = true; status.textContent = "Running…"; result.style.display = "none";
+
+    const target = document.getElementById("addr").value.trim().toLowerCase();
+    const len = parseInt(document.getElementById("length").value);
+    const input = document.getElementById("words").value.trim().toLowerCase().split(/\s+/);
+
+    if (!ethers.isAddress(target)) { alert("Invalid address"); btn.disabled=false; return; }
+    if (input.length !== len || input.filter(w=>w==="????").length !== 1) {
+      alert(`Exactly ${len} words required with exactly one ????`); btn.disabled=false; return;
+    }
+
+    const missingIdx = input.indexOf("????");
+    document.getElementById(`s${missingIdx+1}`).textContent = "????";
+    document.getElementById(`s${missingIdx+1}`).classList.add("missing");
+
+    const list = bip39.wordlists.EN;
+
+    for (const w of list) {
+      input[missingIdx] = w;
+      const phrase = input.join(" ");
+      if (!bip39.validateMnemonic(phrase)) continue;
+
+      const seed = await bip39.mnemonicToSeed(phrase);
+      const hd = ethers.HDNodeWallet.fromSeed(seed);
+
+      for (let i = 0; i < 50; i++) {
+        const path = `m/44'/60'/0'/0/${i}`;
+        const addr = hd.derivePath(path).address.toLowerCase();
+        if (addr === target) {
+          document.getElementById(`s${missingIdx+1}`).textContent = w;
+          document.getElementById(`s${missingIdx+1}`).classList.remove("missing");
+          result.innerHTML = `
+            <h3>MISSING WORD FOUND!</h3>
+            <b>Position ${missingIdx+1} → ${w}</b><br><br>
+            <strong>Full seed phrase:</strong>
+            <div class="phrase">${phrase}</div>
+            <small>Address matches at path ${path}</small>
+          `;
+          result.style.display = "block";
+          btn.disabled = false;
+          return;
+        }
+      }
+      status.textContent = `Trying: ${w}…`;
+    }
+
+    result.innerHTML = "No match found – double-check address & words.";
+    result.style.display = "block";
+    btn.disabled = false;
+  };
+</script>
+</body>
+</html>
