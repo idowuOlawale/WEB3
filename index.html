@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Connect Wallet</title>
+
+  <!-- Tailwind CSS (via CDN – perfect for single-file apps) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Wagmi + viem + ethers (all via CDN) -->
+  <script type="module">
+    import { createClient, http } from 'https://cdn.jsdelivr.net/npm/viem@2/+esm';
+    import { mainnet } from 'https://cdn.jsdelivr.net/npm/viem/chains/+esm';
+    import { createWalletClient, custom } from 'https://cdn.jsdelivr.net/npm/viem@2/+esm';
+    import { WagmiConfig, createConfig, configureChains, connect, disconnect, getAccount } from 'https://cdn.jsdelivr.net/npm/wagmi@2/+esm';
+    import { publicProvider } from 'https://cdn.jsdelivr.net/npm/wagmi@2/providers/public/+esm';
+
+    const { chains, publicClient } = configureChains([mainnet], [publicProvider()]);
+
+    const config = createConfig({
+      autoConnect: true,
+      publicClient,
+    });
+
+    window.wagmiConfig = config;
+    window.wagmiChains = chains;
+    window.connectWallet = async () => {
+      await connect({ connector: new (class extends custom(window.ethereum) {})() });
+      render();
+    };
+    window.disconnectWallet = async () => {
+      await disconnect();
+      render();
+    };
+
+    // Initial render + listen to changes
+    function render() {
+      const { address, isConnected } = getAccount();
+      const button = document.getElementById("wallet-button");
+      const text = document.getElementById("button-text");
+
+      if (isConnected && address) {
+        text.textContent = `${address.slice(0, 6)}...${address.slice(-4)}`;
+        button.onclick = window.disconnectWallet;
+      } else {
+        text.textContent = "Connect Wallet";
+        button.onclick = window.connectWallet;
+      }
+    }
+
+    // Watch for account/chain changes (MetaMask etc.)
+    window.ethereum?.on('accountsChanged', render);
+    window.ethereum?.on('chainChanged', render);
+
+    // First render
+    render();
+  </script>
+</head>
+
+<body class="min-h-full bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-6">
+  <div class="text-center">
+    <h1 class="text-4xl font-extrabold text-gray-900 mb-8">
+      Wallet Connect Demo
+    </h1>
+
+    <button
+      id="wallet-button"
+      class="group relative inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold text-lg rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
+    >
+      <!-- Wallet Icon (simple SVG) -->
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M3 10h1m5 0h11a2 2 0 012 2v6 6 0 01-6 6H8a2 2 0 01-2-2v-2m6-8h6a2 2 0 012 2v1" />
+      </svg>
+
+      <span id="button-text">Connect Wallet</span>
+    </button>
+
+    <p class="mt-6 text-gray-600">
+      Works with MetaMask, Rainbow, Coinbase Wallet, etc.
+    </p>
+  </div>
+</body>
+</html>
