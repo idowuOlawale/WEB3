@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Wallet Balance Demo</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+  <script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f0f2f5; }
+    button { padding: 12px 24px; font-size: 16px; margin: 10px; cursor: pointer; }
+    input { padding: 10px; font-size: 16px; width: 80%; max-width: 400px; margin: 10px 0; }
+    .container { max-width: 600px; margin: auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
+    .balance { font-size: 24px; margin: 20px 0; }
+    .address { word-break: break-all; color: #555; }
+    .section { margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
+    #tokenList { list-style: none; padding: 0; }
+    #tokenList li { margin: 10px 0; font-size: 18px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Wallet Connect Demo</h1>
+    <div id="status">Not connected</div>
+    <button id="connectBtn">Connect Wallet</button>
+    <button id="disconnectBtn" style="display:none;">Disconnect</button>
+
+    <div id="accountInfo" style="display:none; margin-top: 30px;">
+      <p><strong>Address:</strong><br><span class="address" id="address"></span></p>
+      <p><strong>Chain ID:</strong> <span id="chainId"></span></p>
+      <p class="balance"><strong>Native Balance:</strong> <span id="balance">0</span> <span id="symbol"></span></p>
+
+      <div class="section">
+        <h2>Switch Chain</h2>
+        <select id="chainSelect">
+          <option value="1">Ethereum Mainnet (1)</option>
+          <option value="137">Polygon (137)</option>
+          <option value="56">BNB Chain (56)</option>
+          <option value="42161">Arbitrum One (42161)</option>
+          <option value="10">Optimism (10)</option>
+          <!-- Add more chains as needed -->
+        </select>
+        <button id="switchChainBtn">Switch</button>
+      </div>
+
+      <div class="section">
+        <h2>ERC-20 Token Balances</h2>
+        <input type="text" id="tokenAddress" placeholder="Enter ERC-20 Token Contract Address">
+        <button id="addTokenBtn">Add Token</button>
+        <ul id="tokenList"></ul>
+      </div>
+
+      <div class="section">
+        <h2>Recent Transactions</h2>
+        <button id="loadTxBtn">Load Last 5 Transactions</button>
+        <ul id="txList"></ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let web3;
+    let provider;       // MetaMask or WalletConnect provider
+    let userAddress;
+    let currentChainId;
+
+    const connectBtn = document.getElementById('connectBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const status = document.getElementById('status');
+    const accountInfo = document.getElementById('accountInfo');
+    const addressEl = document.getElementById('address');
+    const chainIdEl = document.getElementById('chainId');
+    const balanceEl = document.getElementById('balance');
+    const symbolEl = document.getElementById('symbol');
+    const chainSelect = document.getElementById('chainSelect');
+    const switchChainBtn = document.getElementById('switchChainBtn');
+    const tokenAddressInput = document.getElementById('tokenAddress');
+    const addTokenBtn = document.getElementById('addTokenBtn');
+    const tokenList = document.getElementById('tokenList');
+    const loadTxBtn = document.getElementById('loadTxBtn');
+    const txList = document.getElementById('txList');
+
+    // Chain configurations
+    const chains = {
+      1: { name: 'Ethereum Mainnet', rpc: 'https://ethereum-mainnet-rpc.allthatnode.com', symbol: 'ETH', explorer: 'https://etherscan.io' },
+      137: { name: 'Polygon', rpc: 'https://polygon-rpc.com', symbol: 'MATIC', explorer: 'https://polygonscan.com' },
+      56: { name: 'BNB Chain', rpc: 'https://bsc-dataseed.binance.org/', symbol: 'BNB', explorer: 'https://bscscan.com' },
+      42161: { name: 'Arbitrum One', rpc: 'https://arb1.arbitrum.io/rpc', symbol: 'ETH', explorer: 'https://arbiscan.io' },
+      10: { name: 'Optimism', rpc: 'https://mainnet.optimism.io', symbol: 'ETH', explorer: 'https://optimistic.etherscan.io' },
+      // Add more chains with RPCs and explorers
+    };
+
+    // ==== 1. Try MetaMask first (injected provider) ====
+    async function connectMetaMask() {
+      if (window.ethereum) {
+        provider = window.ethereum;
+        web3 = new Web3(provider);
+
+        try {
+          const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+          handleAccountsChanged(accounts);
+          setupEventListeners();
+          return true;
+        } catch (err) {
+          console.error(err);
+          status.textContent = "MetaMask denied";
+          return false;
+        }
+      }
+      return false;
+    }
+
+    // ==== 2. Fallback to WalletConnect ====
+    async function connectWalletConnect() {
+      const rpcs = Object.fromEntries(Object.entries(chains).map(([id, { rpc }]) => [id, rpc]));
+
+      provider = new WalletConnectProvider.default({
+        rpc: rpcs,
+        qrcode: true,
+      });
+
+      try {
+        await provider.enable();
+        web3 = new Web3(provider);
+        const accounts = await web3.eth.getAccounts();
+        handleAccountsChanged(accounts);
+        setupEventListeners();
+        return true;
+      } catch (err) {
+        console.error(err);
+        status.textContent = "WalletConnect canceled";
+        return false;
+      }
+    }
+
+    // ==== Main connect function ====
+    connectBtn.onclick = async () => {
+      status.textContent = "Connecting...";
+      const metaMaskOk = await connectMetaMask();
+      if (!metaMaskOk) await connectWalletConnect();
+    };
+
+    disconnectBtn.onclick = () => {
+      if (provider?.disconnect) provider.disconnect();
+      if (provider?.close) provider.close();
+      resetUI();
+    };
+
+    function handleAccountsChanged(accounts) {
+      if (accounts.length === 0) {
+        resetUI();
+        return;
+      }
+      userAddress = accounts[0];
+      addressEl.textContent = userAddress;
+      updateChainAndBalance();
+      status.textContent = "Connected";
+      connectBtn.style.display = 'none';
+      disconnectBtn.style.display = 'inline-block';
+      accountInfo.style.display = 'block';
+    }
+
+    async function updateChainAndBalance() {
+      currentChainId = await web3.eth.getChainId();
+      chainIdEl.textContent = currentChainId;
+      chainSelect.value = currentChainId;
+
+      const balanceWei = await web3.eth.getBalance(userAddress);
+      const balanceEth = web3.utils.fromWei(balanceWei, 'ether');
+      balanceEl.textContent = parseFloat(balanceEth).toFixed(4);
+
+      const chainConfig = chains[currentChainId] || { symbol: 'Native' };
+      symbolEl.textContent = chainConfig.symbol;
+    }
+
+    function setupEventListeners() {
+      // MetaMask events
+      if (window.ethereum) {
+        window.ethereum.on('accountsChanged', handleAccountsChanged);
+        window.ethereum.on('chainChanged', () => location.reload());
+      }
+      // WalletConnect events
+      if (provider?.on) {
+        provider.on("accountsChanged", handleAccountsChanged);
+        provider.on("chainChanged", (chainId) => {
+          currentChainId = chainId;
+          chainIdEl.textContent = chainId;
+          updateChainAndBalance();
+        });
+        provider.on("disconnect", () => resetUI());
+      }
+    }
+
+    function resetUI() {
+      status.textContent = "Not connected";
+      connectBtn.style.display = 'inline-block';
+      disconnectBtn.style.display = 'none';
+      accountInfo.style.display = 'none';
+      tokenList.innerHTML = '';
+      txList.innerHTML = '';
+      userAddress = null;
+    }
+
+    // ==== Chain Switcher ====
+    switchChainBtn.onclick = async () => {
+      const targetChainId = parseInt(chainSelect.value);
+      const hexChainId = `0x${targetChainId.toString(16)}`;
+
+      try {
+        await provider.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: hexChainId }],
+        });
+      } catch (switchError) {
+        if (switchError.code === 4902) {
+          // Chain not added, add it
+          const chainConfig = chains[targetChainId];
+          await provider.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: hexChainId,
+              chainName: chainConfig.name,
+              nativeCurrency: { name: chainConfig.symbol, symbol: chainConfig.symbol, decimals: 18 },
+              rpcUrls: [chainConfig.rpc],
+              blockExplorerUrls: [chainConfig.explorer],
+            }],
+          });
+        } else {
+          console.error(switchError);
+        }
+      }
+      updateChainAndBalance();
+    };
+
+    // ==== ERC-20 Token Balance ====
+    const tokenABI = [
+      { "constant": true, "inputs": [{ "name": "_owner", "type": "address" }], "name": "balanceOf", "outputs": [{ "name": "balance", "type": "uint256" }], "type": "function" },
+      { "constant": true, "inputs": [], "name": "symbol", "outputs": [{ "name": "", "type": "string" }], "type": "function" },
+      { "constant": true, "inputs": [], "name": "decimals", "outputs": [{ "name": "", "type": "uint8" }], "type": "function" }
+    ];
+
+    addTokenBtn.onclick = async () => {
+      const contractAddress = tokenAddressInput.value.trim();
+      if (!contractAddress || !web3.utils.isAddress(contractAddress)) {
+        alert('Invalid token address');
+        return;
+      }
+
+      try {
+        const token = new web3.eth.Contract(tokenABI, contractAddress);
+        const bal = await token.methods.balanceOf(userAddress).call();
+        const symbol = await token.methods.symbol().call();
+        const decimals = await token.methods.decimals().call();
+        const balance = (bal / (10 ** decimals)).toFixed(4);
+
+        const li = document.createElement('li');
+        li.textContent = `${symbol}: ${balance}`;
+        tokenList.appendChild(li);
+
+        tokenAddressInput.value = '';
+      } catch (err) {
+        console.error(err);
+        alert('Failed to fetch token balance');
+      }
+    };
+
+    // ==== Recent Transactions (last 5 blocks, simple scan) ====
+    // Note: This is a basic implementation; for full history, use an API like Etherscan
+    loadTxBtn.onclick = async () => {
+      txList.innerHTML = '';
+      try {
+        const latestBlock = await web3.eth.getBlockNumber();
+        let txCount = 0;
+        for (let i = 0; i < 20 && txCount < 5; i++) { // Scan last 20 blocks max
+          const block = await web3.eth.getBlock(latestBlock - i, true);
+          block.transactions.forEach(tx => {
+            if (tx.from === userAddress || tx.to === userAddress) {
+              const li = document.createElement('li');
+              const explorer = chains[currentChainId]?.explorer || 'https://etherscan.io';
+              li.innerHTML = `Tx: <a href="${explorer}/tx/${tx.hash}" target="_blank">${tx.hash.slice(0,10)}...</a> Value: ${web3.utils.fromWei(tx.value, 'ether')} ${symbolEl.textContent}`;
+              txList.appendChild(li);
+              txCount++;
+              if (txCount >= 5) return;
+            }
+          });
+        }
+        if (txCount === 0) {
+          txList.innerHTML = '<li>No recent transactions found</li>';
+        }
+      } catch (err) {
+        console.error(err);
+        txList.innerHTML = '<li>Error loading transactions</li>';
+      }
+    };
+
+    // Auto-connect if already authorized (MetaMask)
+    if (window.ethereum?.selectedAddress) {
+      connectMetaMask();
+    }
+  </script>
+</body>
+</html>
