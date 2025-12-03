@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Final Sweep (0.00008 ETH OK)</title>
+<script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+<style>
+  body{background:#0f172a;color:#e2e8f0;font-family:system-ui;text-align:center;padding:30px;}
+  .box{max-width:560px;margin:40px auto;background:#1e293b;padding:40px;border-radius:20px;}
+  button{padding:16px 32px;margin:15px;font-size:18px;border:none;border-radius:12px;cursor:pointer;color:white;}
+  .connect{background:#3b82f6;}
+  .sweep{background:#10b981;font-weight:bold;}
+  .addr{background:#334155;padding:12px;border-radius:8px;font-family:monospace;word-break:break-all;}
+  #log{margin-top:20px;padding:20px;background:#334155;border-radius:12px;display:none;}
+  .ok{background:#166534;color:#86efac;}
+  .err{background:#7f1d1d;color:#fca5a5;}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>Final Sweep</h1>
+  <p>Works with 0.000080 ETH (your current balance)</p>
+  <button class="connect" onclick="connect()">Connect Old Wallet</button>
+
+  <div id="main" style="display:none;margin-top:30px;">
+    <p>Old wallet:<br><span class="addr" id="old"></span></p>
+    <p>New wallet:<br><span class="addr">0xcde71a94923dd426910ce9beb8e1d1c3eb11cd2f</span></p>
+    <button class="sweep" onclick="sweep()">Send ALL USDC + ETH Now</button>
+    <div id="log"></div>
+  </div>
+</div>
+
+<script>
+const NEW = "0xcde71a94923dd426910ce9beb8e1d1c3eb11cd2f";
+const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+let web3, addr;
+
+async function connect() {
+  web3 = new Web3(window.ethereum);
+  await ethereum.request({method:'eth_requestAccounts'});
+  if ((await web3.eth.getChainId()) !== 8453) {
+    await ethereum.request({method:"wallet_switchEthereumChain", params:[{chainId:"0x2105"}]});
+  }
+  [addr] = await web3.eth.getAccounts();
+  document.getElementById('old').textContent = addr;
+  document.getElementById('main').style.display = 'block';
+}
+
+async function sweep() {
+  if (!confirm("Send EVERYTHING (USDC + all ETH) to new wallet right now?")) return;
+  const log = document.getElementById('log'); log.style.display='block'; log.className=''; log.textContent='Sending...\n';
+
+  try {
+    // 1. USDC
+    const usdc = new web3.eth.Contract([{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transfer","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}], USDC);
+    const bal = await usdc.methods.balanceOf(addr).call();
+    if (bal > 0) {
+      await usdc.methods.transfer(NEW, bal).send({from: addr, maxPriorityFeePerGas: 0, maxFeePerGas: 250000000}); // super low fees
+      log.textContent += `USDC sent!\n`;
+    }
+
+    // 2. ETH – send literally everything that’s left
+    const ethBal = await web3.eth.getBalance(addr);
+    const tx = {
+      from: addr,
+      to: NEW,
+      value: ethBal - 21000n * 250000000n, // subtract exact gas cost (21k gas × 0.25 gwei)
+      maxPriorityFeePerGas: 0,
+      maxFeePerGas: 250000000 // 0.25 gwei – cheapest possible right now
+    };
+    await web3.eth.sendTransaction(tx);
+    log.textContent += `All ETH sent!\n\nDONE – check your new wallet`;
+    log.className = 'ok';
+  } catch(e) {
+    log.className = 'err';
+    log.textContent += "Error: " + (e.message || e);
+  }
+}
+</script>
+</body></html>
