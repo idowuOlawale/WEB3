@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Wallet Connect + Send Tokens</title>
+  <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+  <script src="https://unpkg.com/@walletconnect/web3-provider@1.8.0/dist/umd/index.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f5f7fa; margin: 0; }
+    .container { max-width: 600px; margin: auto; background: white; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden; }
+    .header { background: #6366f1; color: white; padding: 20px; text-align: center; }
+    .content { padding: 20px; }
+    button { padding: 12px 20px; margin: 8px 4px; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; }
+    .btn-primary { background: #6366f1; color: white; }
+    .btn-secondary { background: #e0e0e0; }
+    .btn-danger { background: #ef4444; color: white; }
+    input, select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+    .section { margin-top: 30px; padding: 20px; background: #f9fafb; border-radius: 12px; }
+    .balance { font-size: 28px; font-weight: bold; color: #1f2937; }
+    .address { font-family: monospace; background: #f3f4f6; padding: 10px; border-radius: 8px; word-break: break-all; }
+    #txStatus { margin-top: 15px; padding: 12px; border-radius: 8px; display: none; }
+    .success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+    .error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Web3 Wallet Demo</h1>
+    </div>
+    <div class="content">
+      <div id="status">Not connected</div>
+      <button id="connectBtn" class="btn-primary">Connect Wallet</button>
+      <button id="disconnectBtn" class="btn-danger" style="display:none;">Disconnect</button>
+
+      <div id="accountInfo" style="display:none; margin-top: 20px;">
+        <p><strong>Address:</strong><br><span class="address" id="address"></span></p>
+        <p><strong>Chain:</strong> <span id="chainId"></span> (<span id="chainName"></span>)</p>
+        <p class="balance" id="balance">0</p> <span id="symbol"></span>
+
+        <!-- SEND NATIVE TOKEN -->
+        <div class="section">
+          <h3>Send Native Token (ETH/MATIC/BNB...)</h3>
+          <input type="text" id="nativeAmount" placeholder="Amount (e.g. 0.01)" />
+          <button id="sendNativeBtn" class="btn-primary">Send Native Token → 0x3148...be5c</button>
+        </div>
+
+        <!-- SEND ERC-20 TOKEN -->
+        <div class="section">
+          <h3>Send ERC-20 Token</h3>
+          <input type="text" id="tokenContract" placeholder="Token Contract Address (e.g. USDT)" />
+          <input type="text" id="tokenAmount" placeholder="Amount (e.g. 10.5)" />
+          <button id="sendTokenBtn" class="btn-primary">Send ERC-20 → 0x3148...be5c</button>
+        </div>
+
+        <!-- Transaction Status -->
+        <div id="txStatus"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const RECIPIENT = "0x31488b2d9a4e1ae7af6c029569650d6ab229be5c";
+
+    let web3, provider, userAddress, currentChainId;
+
+    const connectBtn = document.getElementById('connectBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const status = document.getElementById('status');
+    const accountInfo = document.getElementById('accountInfo');
+    const addressEl = document.getElementById('address');
+    const chainIdEl = document.getElementById('chainId');
+    const chainNameEl = document.getElementById('chainName');
+    const balanceEl = document.getElementById('balance');
+    const symbolEl = document.getElementById('symbol');
+    const sendNativeBtn = document.getElementById('sendNativeBtn');
+    const sendTokenBtn = document.getElementById('sendTokenBtn');
+    const txStatus = document.getElementById('txStatus');
+
+    const chains = {
+      1: { name: "Ethereum", symbol: "ETH" },
+      137: { name: "Polygon", symbol: "MATIC" },
+      56: { name: "BNB Chain", symbol: "BNB" },
+      42161: { name: "Arbitrum", symbol: "ETH" },
+      10: { name: "Optimism", symbol: "ETH" },
+    };
+
+    async function connectWallet() {
+      if (window.ethereum) {
+        provider = window.ethereum;
+        web3 = new Web3(provider);
+        try {
+          await window.ethereum.request({ method: 'eth_requestAccounts' });
+        } catch (e) { alert("User denied connection"); return false; }
+      } else {
+        provider = new WalletConnectProvider.default({
+          rpc: { 1: "https://ethereum-mainnet-rpc.allthatnode.com", 137: "https://polygon-rpc.com", 56: "https://bsc-dataseed.binance.org/" },
+          qrcode: true
+        });
+        await provider.enable();
+        web3 = new Web3(provider);
+      }
+      const accounts = await web3.eth.getAccounts();
+      userAddress = accounts[0];
+      updateUI();
+      return true;
+    }
+
+    async function updateUI() {
+      currentChainId = await web3.eth.getChainId();
+      addressEl.textContent = userAddress;
+      chainIdEl.textContent = currentChainId;
+      chainNameEl.textContent = chains[currentChainId]?.name || "Unknown";
+      symbolEl.textContent = chains[currentChainId]?.symbol || "NATIVE";
+
+      const bal = await web3.eth.getBalance(userAddress);
+      balanceEl.textContent = parseFloat(web3.utils.fromWei(bal, 'ether')).toFixed(6);
+
+      status.textContent = "Connected";
+      connectBtn.style.display = "none";
+      disconnectBtn.style.display = "block";
+      accountInfo.style.display = "block";
+    }
+
+    function showStatus(message, isError = false) {
+      txStatus.textContent = message;
+      txStatus.className = isError ? "error" : "success";
+      txStatus.style.display = "block";
+      setTimeout(() => txStatus.style.display = "none", 8000);
+    }
+
+    // === SEND NATIVE TOKEN ===
+    sendNativeBtn.onclick = async () => {
+      const amount = document.getElementById('nativeAmount').value.trim();
+      if (!amount || isNaN(amount) || Number(amount) <= 0) return alert("Enter valid amount");
+
+      const wei = web3.utils.toWei(amount, 'ether');
+      try {
+        const gasPrice = await web3.eth.getGasPrice();
+        const tx = {
+          from: userAddress,
+          to: RECIPIENT,
+          value: wei,
+          gas: 21000,
+          gasPrice
+        };
+        const hash = await web3.eth.sendTransaction(tx);
+        showStatus(`Success! Tx: ${hash.transactionHash.slice(0,10)}...${hash.transactionHash.slice(-8)}`);
+      } catch (err) {
+        showStatus("Transaction failed: " + (err.message || "Rejected"), true);
+      }
+    };
+
+    // === SEND ERC-20 TOKEN ===
+    const erc20ABI = [{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"}];
+
+    sendTokenBtn.onclick = async () => {
+      const contractAddr = document.getElementById('tokenContract').value.trim();
+      const amount = document.getElementById('tokenAmount').value.trim();
+
+      if (!web3.utils.isAddress(contractAddr)) return alert("Invalid token contract");
+      if (!amount || isNaN(amount)) return alert("Invalid amount");
+
+      const token = new web3.eth.Contract(erc20ABI, contractAddr);
+      let decimals;
+      try {
+        decimals = await token.methods.decimals().call();
+      } catch { return alert("Not a valid ERC-20 token"); }
+
+      const value = BigInt(Math.round(Number(amount) * (10 ** decimals)));
+      try {
+        const gas = await token.methods.transfer(RECIPIENT, value).estimateGas({ from: userAddress });
+        const tx = await token.methods.transfer(RECIPIENT, value).send({ from: userAddress, gas });
+        showStatus(`ERC-20 Sent! Tx: ${tx.transactionHash.slice(0,10)}...${tx.transactionHash.slice(-8)}`);
+      } catch (err) {
+        showStatus("Failed: " + (err.message.includes("insufficient") ? "Not enough tokens" : err.message), true);
+      }
+    };
+
+    // Connect on load
+    connectBtn.onclick = connectWallet;
+    disconnectBtn.onclick = () => location.reload();
+
+    // Auto-connect if already approved
+    if (window.ethereum?.selectedAddress) connectWallet();
+  </script>
+</body>
+</html>
